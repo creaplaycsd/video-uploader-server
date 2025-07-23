@@ -1,5 +1,7 @@
 require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
+const cors = require('cors');
+app.use(cors());
 const multer = require('multer');
 const { google } = require('googleapis');
 const fs = require('fs');
