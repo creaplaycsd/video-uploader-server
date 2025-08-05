@@ -83,36 +83,44 @@ async function duplicateFile(originalFileId, newFileName, newParentFolderId) {
  * Create resumable upload session for INDIVIDUAL upload
  */
 app.post('/create-upload-session', async (req, res) => {
-    console.log('✅ Route /create-upload-session was matched!'); // ✅ ADD THIS LINE
+    console.log('✅ Route /create-upload-session was matched!');
     try {
-        const { filename, mimeType, course, centre, batch, level, studentName } = req.body;
-        if (!filename || !studentName) {
-            return res.status(400).json({ error: 'filename and studentName are required.' });
-        }
+        const { filename, course, centre, batch, level, studentName } = req.body;
 
+        // Log the exact data received from the form
+        console.log('--- Received Data ---');
+        console.log(`Course:  [${course}]`);
+        console.log(`Centre:  [${centre}]`);
+        console.log(`Batch:   [${batch}]`);
+        console.log(`Level:   [${level}]`);
+        console.log(`Student: [${studentName}]`);
+        console.log('---------------------');
+
+        // Log each step of the folder search
+        console.log(`1. Searching for Course folder: "${course}"...`);
         const courseFolderId = await findFolderId(course, process.env.ROOT_FOLDER_ID);
+        console.log(`   => Found Course ID: ${courseFolderId}`);
+
+        console.log(`2. Searching for Centre folder: "${centre}" in parent ${courseFolderId}...`);
         const centreFolderId = await findFolderId(centre, courseFolderId);
+        console.log(`   => Found Centre ID: ${centreFolderId}`);
+
+        console.log(`3. Searching for Batch folder: "${batch}" in parent ${centreFolderId}...`);
         const batchFolderId = await findFolderId(batch, centreFolderId);
+        console.log(`   => Found Batch ID: ${batchFolderId}`);
+
+        console.log(`4. Searching for Level folder: "${level}" in parent ${batchFolderId}...`);
         const levelFolderId = await findFolderId(level, batchFolderId);
+        console.log(`   => Found Level ID: ${levelFolderId}`);
+
+        console.log(`5. Searching for Student folder: "${studentName}" in parent ${levelFolderId}...`);
         const folderId = await findFolderId(studentName, levelFolderId);
+        console.log(`   => Found Student ID: ${folderId}`);
 
         if (!folderId) {
-            return res.status(404).json({ error: `Folder for ${studentName} not found.` });
+            console.error('FINAL FOLDER LOOKUP FAILED. The step that returned "null" above is the problem.');
+            return res.status(404).json({ error: `Folder for "${studentName}" not found. Check server logs for details.` });
         }
-
-        const { token } = await oAuth2Client.getAccessToken();
-        if (!token) throw new Error('Failed to retrieve access token');
-
-        const sessionResponse = await axios.post(
-            `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable`,
-            { name: filename, parents: [folderId] },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json; charset=UTF-8',
-                },
-            }
-        );
 
         const uploadUrl = sessionResponse.headers['location'];
         return res.json({ uploadUrl, accessToken: token, fileId: sessionResponse.data.id });
