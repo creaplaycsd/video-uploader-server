@@ -5,18 +5,17 @@ const { google } = require('googleapis');
 const axios = require('axios');
 const bodyParser = require('body-parser');
 
-// ✅ ADD THIS MIDDLEWARE
-app.use((req, res, next) => {
-  console.log(`--> Incoming Request: ${req.method} ${req.originalUrl}`);
-  next();
-});
-
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
 
+// ✅ ADD THIS MIDDLEWARE
+app.use((req, res, next) => {
+  console.log(`--> Incoming Request: ${req.method} ${req.originalUrl}`);
+  next();
+});
 // Google OAuth2 Client
 const oAuth2Client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
