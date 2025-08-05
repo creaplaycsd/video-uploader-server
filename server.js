@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -36,8 +37,6 @@ app.get('/', (req, res) => {
  * Helper function to find a folder ID by name and parent
  */
 async function findFolderId(folderName, parentFolderId) {
-   // ✅ ADD THIS LINE RIGHT AT THE TOP FOR PROOF
-  console.log('--- Running NEW case-insensitive findFolderId function! ---');
     try {
         // Return null if there's no parent or name to search for
         if (!parentFolderId || !folderName) {
@@ -104,34 +103,53 @@ async function duplicateFile(originalFileId, newFileName, newParentFolderId) {
  * Create resumable upload session for INDIVIDUAL upload
  */
 app.post('/create-upload-session', async (req, res) => {
-    console.log('--- RUNNING "LIST ALL FOLDERS" DEBUG TEST ---');
+    console.log('✅ Route /create-upload-session was matched!');
     try {
-        const parentFolderId = process.env.ROOT_FOLDER_ID;
-        console.log(`Attempting to list ALL folders inside parent ID: ${parentFolderId}`);
+        const { filename, course, centre, batch, level, studentName } = req.body;
 
-        // The query is now simplified to list ALL folders in the parent.
-        const response = await drive.files.list({
-            q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            fields: 'files(id, name)', // We need name and ID
-            spaces: 'drive',
-        });
+        // Log the exact data received from the form
+        console.log('--- Received Data ---');
+        console.log(`Course:  [${course}]`);
+        console.log(`Centre:  [${centre}]`);
+        console.log(`Batch:   [${batch}]`);
+        console.log(`Level:   [${level}]`);
+        console.log(`Student: [${studentName}]`);
+        console.log('---------------------');
 
-        console.log('✅ Google API call was successful.');
-        console.log('Found the following folders inside the root:');
-        // Log the entire list of found folders
-        console.log(JSON.stringify(response.data.files, null, 2));
+        // Log each step of the folder search
+        console.log(`1. Searching for Course folder: "${course}"...`);
+        const courseFolderId = await findFolderId(course, process.env.ROOT_FOLDER_ID);
+        console.log(`   => Found Course ID: ${courseFolderId}`);
 
-        res.status(200).json({
-            message: 'Debug test complete. Check server logs to see the list of all folders found.',
-            data: response.data.files
-        });
+        console.log(`2. Searching for Centre folder: "${centre}" in parent ${courseFolderId}...`);
+        const centreFolderId = await findFolderId(centre, courseFolderId);
+        console.log(`   => Found Centre ID: ${centreFolderId}`);
 
+        console.log(`3. Searching for Batch folder: "${batch}" in parent ${centreFolderId}...`);
+        const batchFolderId = await findFolderId(batch, centreFolderId);
+        console.log(`   => Found Batch ID: ${batchFolderId}`);
+
+        console.log(`4. Searching for Level folder: "${level}" in parent ${batchFolderId}...`);
+        const levelFolderId = await findFolderId(level, batchFolderId);
+        console.log(`   => Found Level ID: ${levelFolderId}`);
+
+        console.log(`5. Searching for Student folder: "${studentName}" in parent ${levelFolderId}...`);
+        const folderId = await findFolderId(studentName, levelFolderId);
+        console.log(`   => Found Student ID: ${folderId}`);
+
+        if (!folderId) {
+            console.error('FINAL FOLDER LOOKUP FAILED. The step that returned "null" above is the problem.');
+            return res.status(404).json({ error: `Folder for "${studentName}" not found. Check server logs for details.` });
+        }
+
+        const uploadUrl = sessionResponse.headers['location'];
+        return res.json({ uploadUrl, accessToken: token, fileId: sessionResponse.data.id });
     } catch (err) {
-        console.error('!!! GOOGLE API CALL FAILED !!!');
-        console.error('FULL GOOGLE API ERROR:', JSON.stringify(err, null, 2));
-        res.status(500).json({ error: 'Debug test failed. Check server logs.' });
+        console.error('Error creating upload session:', err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
     }
 });
+
 /**
  * Create resumable upload session for GROUP upload and handle duplication
  */
