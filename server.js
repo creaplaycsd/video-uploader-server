@@ -37,16 +37,35 @@ app.get('/', (req, res) => {
  */
 async function findFolderId(folderName, parentFolderId) {
     try {
-        if (!parentFolderId) return null;
-        const { token } = await oAuth2Client.getAccessToken();
+        // Return null if there's no parent or name to search for
+        if (!parentFolderId || !folderName) {
+            return null;
+        }
+
+        // 1. Get a list of ALL subfolders within the parent folder
         const res = await drive.files.list({
-            q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
-            fields: 'files(id)',
+            q: `mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
+            // Important: We need to fetch the 'name' field to compare it
+            fields: 'files(id, name)',
             spaces: 'drive',
         });
-        return res.data.files.length > 0 ? res.data.files[0].id : null;
+
+        const allSubfolders = res.data.files;
+        if (!allSubfolders || allSubfolders.length === 0) {
+            return null; // No subfolders found at all
+        }
+
+        // 2. Loop through the results and compare names in lowercase
+        const targetFolderName = folderName.toLowerCase();
+        const foundFolder = allSubfolders.find(
+            (folder) => folder.name.toLowerCase() === targetFolderName
+        );
+
+        // 3. Return the folder's ID if we found a match, otherwise return null
+        return foundFolder ? foundFolder.id : null;
+
     } catch (err) {
-        console.error('Error in findFolderId:', err.message);
+        console.error(`Error in findFolderId while searching for "${folderName}":`, err.message);
         return null;
     }
 }
