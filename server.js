@@ -31,14 +31,47 @@ app.get('/', (req, res) => {
  * Helper function to find a folder ID by name and parent
  */
 async function findFolderId(folderName, parentFolderId) {
-    if (!parentFolderId) return null;
-    const { token } = await oAuth2Client.getAccessToken();
-    const res = await drive.files.list({
-        q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
-        fields: 'files(id)',
-        spaces: 'drive',
-    });
-    return res.data.files.length > 0 ? res.data.files[0].id : null;
+    try {
+        if (!parentFolderId) return null;
+        const { token } = await oAuth2Client.getAccessToken();
+        const res = await drive.files.list({
+            q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
+            fields: 'files(id)',
+            spaces: 'drive',
+        });
+        return res.data.files.length > 0 ? res.data.files[0].id : null;
+    } catch (err) {
+        console.error('Error in findFolderId:', err.message);
+        return null;
+    }
+}
+
+/**
+ * Helper function to duplicate a file and rename it
+ */
+async function duplicateFile(originalFileId, newFileName, newParentFolderId) {
+    try {
+        if (!originalFileId || !newFileName || !newParentFolderId) {
+            console.error('Missing parameters for file duplication');
+            return null;
+        }
+
+        const { token } = await oAuth2Client.getAccessToken();
+
+        // Copy the file
+        const res = await drive.files.copy({
+            fileId: originalFileId,
+            requestBody: {
+                name: newFileName,
+                parents: [newParentFolderId]
+            }
+        });
+
+        return res.data;
+    } catch (err) {
+        console.error('Error duplicating file:', err.response?.data || err.message);
+        return null;
+    }
 }
 
 /**
@@ -51,7 +84,6 @@ app.post('/create-upload-session', async (req, res) => {
             return res.status(400).json({ error: 'filename and studentName are required.' });
         }
 
-        // Find the student's folder ID on the server
         const courseFolderId = await findFolderId(course, process.env.ROOT_FOLDER_ID);
         const centreFolderId = await findFolderId(centre, courseFolderId);
         const batchFolderId = await findFolderId(batch, centreFolderId);
@@ -85,7 +117,7 @@ app.post('/create-upload-session', async (req, res) => {
 });
 
 /**
- * Create resumable upload session for GROUP upload
+ * Create resumable upload session for GROUP upload and handle duplication
  */
 app.post('/create-group-upload-session', async (req, res) => {
     try {
@@ -94,7 +126,6 @@ app.post('/create-group-upload-session', async (req, res) => {
             return res.status(400).json({ error: 'Missing required group upload fields.' });
         }
 
-        // Find the primary student's folder ID first
         const courseFolderId = await findFolderId(course, process.env.ROOT_FOLDER_ID);
         const centreFolderId = await findFolderId(centre, courseFolderId);
         const batchFolderId = await findFolderId(batch, centreFolderId);
@@ -120,26 +151,33 @@ app.post('/create-group-upload-session', async (req, res) => {
             }
         );
         const uploadUrl = sessionResponse.headers['location'];
+        const originalFileId = sessionResponse.data.id;
 
-        // 2. Respond immediately with the session URL
-        return res.json({ uploadUrl, accessToken: token });
+        // 2. Respond immediately to the client with the session URL
+        res.json({ uploadUrl, accessToken: token, fileId: originalFileId });
+
+        // 3. Perform file duplication in the background
+        if (originalFileId) {
+            for (const student of selectedStudents) {
+                if (student === studentName) continue; // Skip primary student
+                
+                const studentFolderId = await findFolderId(student, levelFolderId);
+                if (studentFolderId) {
+                    const extension = filename.split('.').pop();
+                    const newFileName = `${filename.split('_')[0]}_${student}_${level}_${centre}.${extension}`;
+                    await duplicateFile(originalFileId, newFileName, studentFolderId);
+                } else {
+                    console.warn(`Folder for student ${student} not found. Skipping duplication.`);
+                }
+            }
+        }
+
     } catch (err) {
         console.error('Error creating group upload session:', err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });
-
-// A simple endpoint to check the status of a long-running duplication task
-app.get('/check-duplication-status', async (req, res) => {
-    const { fileId } = req.query;
-    if (!fileId) {
-        return res.status(400).json({ error: 'fileId is required.' });
-    }
-    // Logic here to check a database or in-memory map for task status
-    // For now, we'll just assume success
-    res.json({ status: 'completed' });
-});
-
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log(`Server started at http://localhost:${port}`);
+    console.log(`Server started on port ${port}`);
 });
