@@ -36,6 +36,8 @@ app.get('/', (req, res) => {
  * Helper function to find a folder ID by name and parent
  */
 async function findFolderId(folderName, parentFolderId) {
+   // ✅ ADD THIS LINE RIGHT AT THE TOP FOR PROOF
+  console.log('--- Running NEW case-insensitive findFolderId function! ---');
     try {
         // Return null if there's no parent or name to search for
         if (!parentFolderId || !folderName) {
