@@ -104,46 +104,34 @@ async function duplicateFile(originalFileId, newFileName, newParentFolderId) {
  * Create resumable upload session for INDIVIDUAL upload
  */
 app.post('/create-upload-session', async (req, res) => {
-    console.log('--- RUNNING ULTIMATE DEBUG TEST ---');
+    console.log('--- RUNNING "LIST ALL FOLDERS" DEBUG TEST ---');
     try {
         const parentFolderId = process.env.ROOT_FOLDER_ID;
-        // We hardcode the name to isolate the problem.
-        const folderNameToFind = 'Speech and Drama'; 
+        console.log(`Attempting to list ALL folders inside parent ID: ${parentFolderId}`);
 
-        console.log(`Attempting to find folder "${folderNameToFind}" inside parent ID: ${parentFolderId}`);
-
-        // We use the simpler, direct query for this test.
+        // The query is now simplified to list ALL folders in the parent.
         const response = await drive.files.list({
-            q: `name = '${folderNameToFind}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            fields: 'files(id, name)',
+            q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id, name)', // We need name and ID
             spaces: 'drive',
         });
 
         console.log('✅ Google API call was successful.');
-        console.log('Files found:', response.data.files);
+        console.log('Found the following folders inside the root:');
+        // Log the entire list of found folders
+        console.log(JSON.stringify(response.data.files, null, 2));
 
-        if (response.data.files.length === 0) {
-            res.status(404).json({ 
-                message: "Debug test complete: API call succeeded but found 0 files with that exact name." 
-            });
-        } else {
-            res.status(200).json({ 
-                message: 'Debug test complete: Folder was found!', 
-                data: response.data.files 
-            });
-        }
+        res.status(200).json({
+            message: 'Debug test complete. Check server logs to see the list of all folders found.',
+            data: response.data.files
+        });
 
     } catch (err) {
         console.error('!!! GOOGLE API CALL FAILED !!!');
-        // This will log the entire detailed error object from Google
         console.error('FULL GOOGLE API ERROR:', JSON.stringify(err, null, 2));
-        
-        res.status(500).json({ 
-            error: 'Debug test failed. Check server logs for the full Google API error.' 
-        });
+        res.status(500).json({ error: 'Debug test failed. Check server logs.' });
     }
 });
-
 /**
  * Create resumable upload session for GROUP upload and handle duplication
  */
