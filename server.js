@@ -5,6 +5,12 @@ const { google } = require('googleapis');
 const axios = require('axios');
 const bodyParser = require('body-parser');
 
+// ✅ ADD THIS MIDDLEWARE
+app.use((req, res, next) => {
+  console.log(`--> Incoming Request: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -78,6 +84,7 @@ async function duplicateFile(originalFileId, newFileName, newParentFolderId) {
  * Create resumable upload session for INDIVIDUAL upload
  */
 app.post('/create-upload-session', async (req, res) => {
+    console.log('✅ Route /create-upload-session was matched!'); // ✅ ADD THIS LINE
     try {
         const { filename, mimeType, course, centre, batch, level, studentName } = req.body;
         if (!filename || !studentName) {
