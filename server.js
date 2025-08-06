@@ -30,6 +30,7 @@ app.get('/', (req, res) => {
 
 // Create resumable upload session
 app.post('/create-upload-session', async (req, res) => {
+  console.log("Received a request to create an upload session.");
     try {
         const { filename, mimeType, folderId } = req.body;
         if (!filename || !folderId) {
