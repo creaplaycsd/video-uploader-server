@@ -85,6 +85,39 @@ app.post('/get-group-folder-ids', async (req, res) => {
     }
 });
 
+// New endpoint: Search for a file by name and parent folder
+app.post('/find-file-id', async (req, res) => {
+    try {
+        const { filename, folderId } = req.body;
+        if (!filename || !folderId) {
+            return res.status(400).json({ error: 'Filename and folderId are required.' });
+        }
+
+        const { token } = await oAuth2Client.getAccessToken();
+        if (!token) throw new Error('Failed to retrieve access token');
+
+        const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+        // Search for the file in the specified folder
+        const response = await drive.files.list({
+            q: `'${folderId}' in parents and name='${filename}' and trashed=false`,
+            fields: 'files(id)',
+            spaces: 'drive',
+            oauth_token: token
+        });
+
+        const files = response.data.files;
+        if (files.length > 0) {
+            res.status(200).json({ fileId: files[0].id });
+        } else {
+            res.status(404).json({ error: 'File not found.' });
+        }
+    } catch (err) {
+        console.error('Error finding file:', err.response?.data || err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // New endpoint: Duplicate files
 app.post('/duplicate-files', async (req, res) => {
     try {
