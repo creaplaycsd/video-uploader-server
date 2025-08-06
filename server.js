@@ -14,6 +14,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Content-Range'],
 }));
+console.log("Server is starting up and ready to receive requests!");
 // Google OAuth2 Client
 const oAuth2Client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
