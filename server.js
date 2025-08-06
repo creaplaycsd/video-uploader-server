@@ -8,9 +8,12 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(bodyParser.json());
-
+app.use(cors({
+  origin: '*', // Allow all origins for testing. For production, set this to your frontend URL.
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Content-Range'],
+}));
 // Google OAuth2 Client
 const oAuth2Client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
