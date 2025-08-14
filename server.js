@@ -32,7 +32,7 @@ app.get('/', (req, res) => {
 app.post('/create-upload-session', async (req, res) => {
   console.log("Received a request to create an upload session.");
     try {
-        const { filename, mimeType, folderId } = req.body;
+        const { filename, mimeType, folderId, uploaderId } = req.body;
         if (!filename || !folderId) {
             return res.status(400).json({ error: 'filename and folderId are required.' });
         }
@@ -42,7 +42,14 @@ app.post('/create-upload-session', async (req, res) => {
 
         const sessionResponse = await axios.post(
             `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable`,
-            { name: filename, parents: [folderId] },
+            { 
+                name: filename, 
+                parents: [folderId],
+                // Include the uploader's ID as a file property
+                appProperties: {
+                    uploader: uploaderId
+                }
+            },
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -103,14 +110,14 @@ app.post('/find-file-id', async (req, res) => {
         // Search for the file in the specified folder
         const response = await drive.files.list({
             q: `'${folderId}' in parents and name='${filename}' and trashed=false`,
-            fields: 'files(id)',
+            fields: 'files(id, webViewLink)',
             spaces: 'drive',
             oauth_token: token
         });
 
         const files = response.data.files;
         if (files.length > 0) {
-            res.status(200).json({ fileId: files[0].id });
+            res.status(200).json({ fileId: files[0].id, fileLink: files[0].webViewLink });
         } else {
             res.status(404).json({ error: 'File not found.' });
         }
@@ -132,31 +139,37 @@ app.post('/duplicate-files', async (req, res) => {
         if (!token) throw new Error('Failed to retrieve access token');
 
         const drive = google.drive({ version: 'v3', auth: oAuth2Client });
-        const results = [];
 
-        for (const data of renameData) {
-            const { student, folderId, newFilename } = data;
-            
-            try {
-                const copyResult = await drive.files.copy({
-                    fileId: sourceFileId,
-                    requestBody: {
-                        name: newFilename,
-                        parents: [folderId]
-                    }
-                });
-                results.push({ student, status: 'success', newFileId: copyResult.data.id });
-            } catch (copyError) {
-                console.error(`Failed to copy file for student ${student}:`, copyError.message);
-                results.push({ student, status: 'failed', error: copyError.message });
-            }
-        }
+        // --- CHANGE 1: Get the appProperties from the source file
+        const sourceFile = await drive.files.get({ fileId: sourceFileId, fields: 'appProperties' });
+        const appProperties = sourceFile.data.appProperties;
 
-        res.status(200).json({ status: 'success', results });
+        // --- CHANGE 2: Immediately send a response to the frontend to prevent timeout
+        res.status(202).json({ status: 'Duplication process started.' });
+
+        // --- CHANGE 3: Replace the for loop with Promise.all for asynchronous processing
+        const duplicationPromises = renameData.map(data => {
+            return drive.files.copy({
+                fileId: sourceFileId,
+                requestBody: {
+                    name: data.newFilename,
+                    parents: [data.folderId],
+                    // --- CHANGE 4: Copy the appProperties to the new file
+                    appProperties: appProperties
+                }
+            }).catch(copyError => {
+                console.error(`Failed to copy file for student ${data.student}:`, copyError.message);
+                return { student: data.student, status: 'failed', error: copyError.message };
+            });
+        });
+
+        // --- CHANGE 5: Execute all the promises concurrently in the background
+        const results = await Promise.all(duplicationPromises);
+        console.log("Duplication process finished:", results);
 
     } catch (err) {
-        console.error('Error duplicating files:', err.response?.data || err.message);
-        res.status(500).json({ error: err.message });
+        console.error('Error starting duplication process:', err.response?.data || err.message);
+        // Note: Do not send a response here, as it's already sent above
     }
 });
 
