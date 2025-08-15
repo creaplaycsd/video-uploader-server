@@ -77,7 +77,7 @@ app.post('/get-group-folder-ids', async (req, res) => {
         const folderIds = {};
         
         for (const student of students) {
-            const folderIdLookupURL = `https://script.google.com/macros/s/AKfycbxydrQ8X_pTr77N8C1yOuJaXhopirPv0t0a1d1IQPSnHgvgGM_x2tDf_z3c_zUdybs/exec?course=${encodeURIComponent(course)}&centre=${encodeURIComponent(centre)}&batch=${encodeURIComponent(batch)}&level=${encodeURIComponent(level)}&student=${encodeURIComponent(student)}`;
+            const folderIdLookupURL = `https://script.google.com/macros/s/AKfycbxydrQ8X_pTr77N8C1yOuJaXhopirPv0t0a1d1IQPSnHgvgGM_x2tDf_z3c_zUdybs/exec?action=getFolderId&course=${encodeURIComponent(course)}&centre=${encodeURIComponent(centre)}&batch=${encodeURIComponent(batch)}&level=${encodeURIComponent(level)}&student=${encodeURIComponent(student)}`;
             const response = await fetch(folderIdLookupURL);
             const folderId = (await response.text()).trim();
             if (folderId && folderId !== "NOT_FOUND") {
