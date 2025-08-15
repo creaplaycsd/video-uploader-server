@@ -173,6 +173,24 @@ app.post('/duplicate-files', async (req, res) => {
     }
 });
 
+// New endpoint: Proxy log data to Google Apps Script
+app.post('/log-upload', async (req, res) => {
+    try {
+        const logData = req.body;
+        const appsScriptURL = "https://script.google.com/macros/s/AKfycbxydrQ8X_pTr77N8C1yOuJaXhopirPv0t0a1d1IQPSnHgvgGM_x2tDf_z3c_zUdybs/exec?action=log";
+
+        const response = await axios.post(appsScriptURL, logData, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Forward the Apps Script's response to the frontend
+        res.status(response.status).json(response.data);
+    } catch (err) {
+        console.error('Error proxying log data:', err.response?.data || err.message);
+        res.status(err.response?.status || 500).json({ error: err.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server started at http://localhost:${port}`);
 });
