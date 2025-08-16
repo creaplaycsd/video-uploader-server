@@ -97,24 +97,21 @@ app.post('/get-group-folder-ids', async (req, res) => {
 // New endpoint: Search for a file by name and parent folder
 app.post('/find-file-id', async (req, res) => {
     try {
-        const { filename, folderId } = req.body;
-        if (!filename || !folderId) {
-            return res.status(400).json({ error: 'Filename and folderId are required.' });
+        const { filename, course, centre, batch, level, student, extension } = req.body;
+        if (!filename || !student || !extension) {
+            return res.status(400).json({ error: 'Filename, student, and extension are required.' });
         }
 
         const { token } = await oAuth2Client.getAccessToken();
         if (!token) throw new Error('Failed to retrieve access token');
-
         const drive = google.drive({ version: 'v3', auth: oAuth2Client });
-
-        // Search for the file in the specified folder
+        const searchName = `${filename}_${student}_${level}_${centre}.${extension}`;
         const response = await drive.files.list({
-            q: `'${folderId}' in parents and name='${filename}' and trashed=false`,
+            q: `name='${searchName}' and trashed=false`,
             fields: 'files(id, webViewLink)',
             spaces: 'drive',
             oauth_token: token
         });
-
         const files = response.data.files;
         if (files.length > 0) {
             res.status(200).json({ fileId: files[0].id, fileLink: files[0].webViewLink });
