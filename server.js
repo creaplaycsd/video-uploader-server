@@ -107,7 +107,7 @@ app.post('/find-file-id', async (req, res) => {
 
         const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
-        const searchName = `${filename}_${student}_${level}_${centre}.${filename.split('.').pop()}`;
+         const searchName = `${filename}_${student}_${level}_${centre}.${extension}`;
 
         const response = await drive.files.list({
             q: `name='${searchName}' and trashed=false`,
